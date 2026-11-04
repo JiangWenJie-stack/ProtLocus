@@ -153,5 +153,4 @@ HMM-guided searches detect genes with matching protein-family evidence. On intro
 
 ProtLocus is MIT licensed; see [LICENSE.txt](LICENSE.txt). It derives from miniprot and retains the upstream copyright notice. Example reference data and their source records are described in [the examples README](examples/README.md).
 
-For the underlying miniprot alignment method, cite:
-XXXXXXXXXXXXXXXX
+
