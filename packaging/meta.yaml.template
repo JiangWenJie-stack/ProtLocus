@@ -1,0 +1,49 @@
+{% set version = "__VERSION__" %}
+
+package:
+  name: protlocus
+  version: {{ version }}
+
+source:
+  url: https://github.com/__REPOSITORY__/releases/download/v{{ version }}/protlocus-{{ version }}.tar.gz
+  sha256: __SHA256__
+
+build:
+  number: 2
+  skip: true  # [not linux or not x86_64]
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ stdlib('c') }}
+    - make
+  host:
+    - zlib
+  run:
+    - zlib
+    - python >=3.9
+    - bash
+    - time
+
+test:
+  source_files:
+    - test/DPP3-hs.gen.fa.gz
+    - test/DPP3-mm.pep.fa.gz
+  commands:
+    - protlocus --version
+    - protlocus-recheck -v
+    - protlocus --help
+    - bash protlocus_hmm_pipeline.sh -h
+    - python3 "$PREFIX/bin/protlocus_genemodel.py" --version
+    - python3 "$PREFIX/bin/protlocus_genemodel.py" --help
+
+about:
+  home: https://github.com/__REPOSITORY__
+  license: MIT
+  license_file: LICENSE.txt
+  summary: Protein-to-genome alignment and HMM-guided gene discovery based on miniprot.
+  dev_url: https://github.com/__REPOSITORY__
+
+extra:
+  recipe-maintainers:
+    - __MAINTAINER__

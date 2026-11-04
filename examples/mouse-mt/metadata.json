@@ -1,0 +1,23 @@
+{
+  "name": "mouse-mt",
+  "description": "Mus musculus complete mitochondrial chromosome",
+  "genome_accession": "NC_005089.1",
+  "genome_length_bp": 16299,
+  "query_accession": "NP_904330.1",
+  "query_length_aa": 514,
+  "gene": "COX1",
+  "translation_table": 2,
+  "expected_cds_1based_inclusive": [
+    5328,
+    6872
+  ],
+  "strand": "+",
+  "downloaded_on": "2026-11-03",
+  "source_url": "https://www.ncbi.nlm.nih.gov/nuccore/NC_005089.1",
+  "retrieval_url": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.fcgi?id=NC_005089.1&db=nuccore&report=genbank&retmode=text&withparts=on",
+  "sequence_sha256": "edaa6a92345bb0554b7b0e178c1d205cd83a9a40686d97aa1e85ca9e03503604",
+  "files": {
+    "genome.fa": "6bef756a4eebc541812f0cb78c95f00fbd4f4d1c602b1b109ed3508f5359555d",
+    "query.faa": "257ab536c8d6c60f45c7d4fb5e3cdf5e9a030cd53e8a5d5dc20eff8ba08e07d5"
+  }
+}

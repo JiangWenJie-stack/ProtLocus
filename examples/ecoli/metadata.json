@@ -1,0 +1,23 @@
+{
+  "name": "ecoli",
+  "description": "Escherichia coli K-12 MG1655 complete genome",
+  "genome_accession": "NC_000913.3",
+  "genome_length_bp": 4641652,
+  "query_accession": "NP_414878.1",
+  "query_length_aa": 1024,
+  "gene": "lacZ",
+  "translation_table": 11,
+  "expected_cds_1based_inclusive": [
+    363231,
+    366305
+  ],
+  "strand": "-",
+  "downloaded_on": "2026-11-03",
+  "source_url": "https://www.ncbi.nlm.nih.gov/nuccore/NC_000913.3",
+  "retrieval_url": "https://www.ncbi.nlm.nih.gov/sviewer/viewer.fcgi?id=NC_000913.3&db=nuccore&report=genbank&retmode=text&withparts=on",
+  "sequence_sha256": "e999dceccb76562d40e49a10d9e6d4cf1c05d184f4f80b92bb32d4a2420c11d0",
+  "files": {
+    "genome.fa": "3c1a6ce8a62af9badd31c4977cd9db5a6804cd867afa3f4f06f669d66c9f4bd5",
+    "query.faa": "14e0d10cbb80b0c46a02d0ac0d4e844c12bf81f41441cae13dda689ffd9ddec0"
+  }
+}

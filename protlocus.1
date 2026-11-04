@@ -1,0 +1,722 @@
+.TH PROTLOCUS 1 "3 November 2026" "ProtLocus 0.1.0" "Bioinformatics tools"
+.SH NAME
+.PP
+protlocus - high-recall protein/profile-to-genome alignment with splicing and frameshifts
+.SH SYNOPSIS
+* Indexing a genome (recommended as indexing can be slow and memory hungry):
+.RS 4
+protlocus
+.RB [ -t
+.IR nThreads ]
+.B -d
+.I ref.mpi
+.I ref.fna
+.RE
+
+* Aligning proteins to a genome:
+.RS 4
+protlocus 
+.RB [ -t
+.IR nThreads ]
+.I ref.mpi
+.I protein.faa
+>
+.I output.paf
+.br
+protlocus 
+.RB [ -t
+.IR nThreads ]
+.I ref.fna
+.I protein.faa
+>
+.I output.paf
+.RE
+
+* Aligning HMMER3 profiles (one or a whole library) to a genome:
+.RS 4
+protlocus
+.RB [ -t
+.IR nThreads ]
+.RB [ --gpu ]
+.I ref.mpi
+.I library.hmm
+>
+.I output.paf
+.RE
+
+* Scanning a whole HMM library with the built-in prescreen (recommended):
+.RS 4
+protlocus
+.RB [ -t
+.IR nThreads ]
+.B --accuracy --prescreen
+.RB [ --tier=fast|balanced|sensitive ]
+.I ref.mpi
+.I library.hmm
+>
+.I output.paf
+.RE
+.SH DESCRIPTION
+ProtLocus aligns protein sequences or HMMER3 profiles to a genome allowing
+potential frameshifts and splicing. It is a derivative of miniprot: without
+.BR --accuracy ,
+.B --gpu
+or a
+.I .hmm
+query its output is intended to match upstream miniprot 0.18. See HMMER3
+PROFILE QUERIES below for the profile path.
+.SH OPTIONS
+.SS Indexing options
+.TP 10
+.BI -k \ INT
+K-mer size for genome-wide indexing [6]
+.TP
+.BI -M \ INT
+Sample k-mers at a rate
+.RI 1/2** INT
+[1]. Increasing this option reduces peak memory but decreases sensitivity.
+.TP
+.BI -L \ INT
+Minimum ORF length to index [30]
+.TP
+.BI -T \ INT
+NCBI translation table (1 through 33 except 7-8 and 17-20) [1]
+.TP
+.BI -b \ INT
+Number of bits per bin [8]. ProtLocus splits the genome into non-overlapping bins of 2^8 bp in size.
+.TP
+.BI -d \ FILE
+Write the index to
+.I FILE
+[].
+.SS Chaining options
+.TP 10
+.B -S
+Disable splicing. It applies
+.RB ` -G1k
+.B -J1k
+.BR -e1k '
+at the same time.
+.TP
+.BI -c \ NUM
+Ignore k-mers occurring
+.I NUM
+times or more [50k]
+.TP
+.BI -G \ NUM
+Max intron size [200k]. This option overrides
+.BR -I .
+.TP
+.BI -I
+Set max intron size to
+.RI min(max(3.6*sqrt( refLen ),10000),300000)
+where
+.I refLen
+is the total length of the input genome.
+.TP
+.BI -n \ NUM
+Min number of syncmers in a chain [10]
+.TP
+.BI -m \ NUM
+Min chaining score [0]
+.TP
+.BI -l \ INT
+K-mer size for the second round of chaining [5]
+.TP
+.BI -e \ NUM
+Max extension from chain ends for alignment or the second round of chaining [10k]
+.TP
+.BI -p \ FLOAT
+Filter out a secondary chain/alignment if its score is
+.I FLOAT
+fraction of the best chain [0.5]
+.TP
+.BI -N \ NUM
+Retain at most
+.I NUM
+number of secondary chains/alignments [30]
+.SS Alignment options
+.TP 10
+.BI -O \ INT
+Gap open penalty [11]
+.TP
+.BI -E \ INT
+Gap extension penalty [1]. A gap of size
+.B g
+costs 
+.RB { -O }+{ -E }* g .
+.TP
+.BI -J \ INT
+Intron open penalty [29]
+.TP
+.BI -F \ INT
+Penalty for frameshifts or in-frame stop codons [23]
+.TP
+.BI -C \ FLOAT
+Weight of splicing penalty [1]. Set to 0 to ignore splicing signals.
+.TP
+.BI -B \ IN
+Bonus score for alignment reaching ends of proteins [5]
+.TP
+.BI -j \ INT
+Splice model for the target genome: 2=vertebrate/insect, 1=general, 0=none [1]. The vertebrate/insect
+model considers `G|GTR...YYYNYAG|' as the optimal splicing sequence and
+penalizes other sequences based on profiles in Sibley et al (2016). According
+to Irimia and Roy (2008) and Sheth et al (2006), the first `G' in the donor
+exon and the poly-Y close to the acceptor may not be conserved in some species.
+The general model takes `|GTR...YAG|' as the optimal sequence. Both models also
+slightly prefer less frequent splice sites including `G|GC...YAG|' and `|AT...AC|'.
+.TP
+.BI --spsc \ FILE
+Splice score file []. Each line is TAB-delimited, consisting of contig name,
+offset of the splice junction, strand (`+' or `-'), donor or acceptor (`D' or
+`A') and an integer score. The score is added the donor/acceptor score function.
+It can be positive or negative and needs to be compatible with the scoring system.
+This option additionally increases
+.B -J
+and
+.B --J2
+by 10 unless they are specified on the command line.
+.TP
+.BI --spsc0 \ INT
+Splice score for positions not in the
+.B --spsc
+file [-7]. This option has no effect if
+.B --spsc
+is not specified.
+.TP
+.BI --spsc-max \ INT
+Cap splice scores to
+.I INT
+[14].
+.TP
+.BI --io-coef \ FLOAT
+Logarithm intron length penalty (EXPERIMENTAL) [0.5]
+.SS Accuracy options
+.TP 10
+.B --accuracy
+Enable the high-recall mode: repetitive-seed rescue, per-contig/strand
+chaining, relaxed candidate retention, no-trusted-anchor DP rescue,
+suspicious-junction re-refinement and composite ranking. Slower than the
+default mode. Every mechanism has an
+.B --acc-no-*
+switch and every threshold an
+.B --acc-*
+knob; see
+.B protlocus --help
+and ACCURACY.md.
+.TP
+.B --fast
+Speed preset of
+.BR --accuracy :
+implies
+.B --accuracy --acc-end-dyn --acc-end-aa-cap
+(end-extension windows scaled with the query length). About 20-25% less
+alignment time for a small recall cost.
+.TP
+.B --profile
+Write per-stage timing and workload counters to stderr as one
+.B [M::profile]
+line at the end of the run.
+.TP
+.B --compact
+Identification preset for compact, gene-dense, intron-poor genomes such as
+yeast. Implies
+.BR --accuracy ,
+raises the anchor-rescue budgets, enables
+.B --acc-strict-multi-exon
+and
+.B --acc-strict-span-ratio=4
+to reject hits spilling across neighbouring genes, sets
+.B --acc-min-score=15 --acc-min-pos-ratio=0.50
+and scales the maximum intron length with the genome size as
+.BR -I .
+.SS Candidate-locus and prescreen options (HMM library scans)
+.TP 10
+.B --prescreen
+Build a six-frame ORF spaced-k-mer index of the genome in-process and generate
+each profile's candidate loci from it (MMseqs2-style profile k-mer prefilter,
+ungapped diagonal, banded gapped alignment, Karlin-Altschul E-value). Loci
+with E-value at or below the tier cutoff replace the genome-wide seed/chain
+stage exactly like a
+.BR --cand-table .
+Mutually exclusive with
+.BR --cand-table .
+Defaults to
+.B --tier=balanced
+when neither
+.B --tier
+nor
+.B --cand-max-evalue
+is given.
+.TP
+.BI --tier= STR
+Sensitivity tier = E-value cutoff on the candidate loci:
+.BR fast ,
+.B balanced
+or
+.BR sensitive .
+With
+.B --prescreen
+(built-in E-values) the cutoffs are E<=0.1/100/10000; with
+.B --cand-table
+(mmseqs E-values) they are E<=100/1000/10000.
+.B sensitive
+also lowers the prescreen k-mer threshold by one.
+.TP
+.BI --small-genome= STR
+.BR auto / on / off
+[auto]. With
+.BR --prescreen ,
+when the genome total length is at or below
+.B --small-genome-size
+(or
+.B on
+forces it), switch to the small-genome recall preset
+.B --ps-kmer=5 --acc-min-ps=0 --acc-min-score=0 --acc-min-pos-ratio=0
+so weak hits reach the output; filter them with
+.B protlocus-recheck
+(E<=1e-5). Any of these four flags given explicitly on the command line is
+kept. On E. coli and yeast this recovers 4-5 percentage points of domain
+recall versus the defaults at unchanged purity.
+.TP
+.BI --small-genome-size= NUM
+Genome-size threshold that triggers
+.B --small-genome=auto
+[50M].
+.TP
+.BI --cand-max-evalue= FLOAT
+Arbitrary E-value cutoff on the candidate loci (ignored when
+.B --tier
+is given); <=0 keeps every listed locus [0].
+.TP
+.BI --cand-table= FILE
+External candidate loci, TSV
+.IR "query name, chrom, start0, end0, strand[, evalue]"
+(for example from
+.BR tools/mmseqs2cand.py ).
+Only the listed loci are refined and aligned; queries absent from the table
+get no hit.
+.TP
+.BI --ps-sens= FLOAT
+Prefilter sensitivity on the mmseqs
+.B -s
+scale; sets the profile k-mer score threshold [7.5].
+.TP
+.BI --ps-kmer= INT
+Spaced k-mer size, 5..7 (index has 20^k buckets: k=6 about 0.5 GB, k=7 about
+10 GB) [6].
+.TP
+.BI --ps-kmer-thr= NUM
+Explicit k-mer score threshold in half-bits, overriding
+.BR --ps-sens ;
+<=0 derives it from
+.B --ps-sens
+(k=6: 22) [0].
+.TP
+.BI --ps-kmer-max= NUM
+Cap on similar k-mers generated per profile window.
+.TP
+.BI --ps-min-orf= INT
+Ignore stop-free ORFs shorter than INT aa [30].
+.TP
+.BI --ps-min-ungapped= NUM
+Ungapped diagonal score floor in half-bits [15].
+.TP
+.BI --ps-max-seqs= NUM
+ORFs per profile passed to the gapped stage [4000].
+.TP
+.BI --ps-band= INT
+Gapped alignment band (aa) around the best ungapped diagonal; <=0 = full
+matrix [32].
+.TP
+.BI --ps-dump= FILE
+Also write the generated candidate table (same TSV as
+.BR --cand-table ,
+6th column = E-value).
+.TP
+.B --no-cand-diag
+Do not seed a prescreen locus from its best ungapped PSSM diagonal when the
+5-mer refine chain is empty (ablation switch; loses divergent family members).
+.TP
+.BI --acc-min-ps= NUM
+Drop a profile-query hit whose HMM Viterbi score (PAF
+.BR ps )
+is below NUM, on top of the DP-score floor; <=0 disables; no effect on
+protein queries [60].
+.TP
+.BI --acc-ps-rescue= AS[,POSR]
+Exempt a hit from
+.B --acc-min-ps
+when its DP score is at least AS and its positive ratio at least POSR (short
+models may fail ps>=60 with strong alignments); AS<=0 disables.
+.TP
+.BI --thr-table= FILE
+Per-query DP-score floor (TSV
+.IR "query name, min_AS" ),
+e.g. decoy-calibrated per-family thresholds; replaces
+.B --acc-min-score
+for listed queries. Kept for reproducibility; the global floors are the
+recommended protocol.
+.TP
+.BI --thr-fallback= NUM
+Floor for queries absent from
+.BR --thr-table ;
+<=0 keeps
+.B --acc-min-score
+[0].
+.TP
+.B --thr-use-ps
+Apply the
+.B --thr-table
+floor to
+.B ps
+instead of
+.BR AS .
+Prefer
+.BR --acc-min-ps .
+.SS GPU options
+.TP 10
+.B --gpu
+Use the OpenCL device for the terminal-extension DP (all extension requests of
+a query are pooled and executed by a persistent multi-queue executor), for
+large inter-anchor gap DP (see
+.BR --gpu-min-cells )
+and, with the environment variable
+.BR MP_HMM_GPU=1 ,
+for HMM profile scoring. Requires a build with
+.BR "make gpu=1" .
+Anything the device cannot take falls back to the CPU SIMD kernels. Extension
+and HMM scores equal the CPU kernels bit-for-bit; the CIGAR-producing gap DP
+returns the same score but may pick a different equal-score path (see
+LIMITATIONS). If no OpenCL device is available a warning
+is printed and the run continues on the CPU.
+.TP
+.BI --gpu-device= INT
+Zero-based OpenCL GPU index [0].
+.TP
+.BI --gpu-min-cells= NUM
+Minimum number of DP cells (nt length times aa length) for an inter-anchor gap
+DP to be submitted to the GPU [1M]. Does not apply to the extension pipeline,
+which takes every request.
+.TP
+.B --gpu-prefilter
+After coarse chaining, score each candidate chain's anchors with a batched
+GPU gapless X-drop kernel and keep only the top
+.B --gpu-prefilter-topk
+chains by gapless score (with a per-contig/strand diversity floor, see
+.BR --gpu-prefilter-diversity ).
+Requires a build with
+.BR "make cuda=1" ;
+on a CPU-only or
+.B "make gpu=1"
+(OpenCL) build the flag is accepted but disabled with a warning and mapping
+proceeds unfiltered.
+.TP
+.BI --gpu-prefilter-topk= NUM
+Number of chains kept per query by
+.B --gpu-prefilter
+[32].
+.TP
+.BI --gpu-prefilter-diversity= NUM
+Minimum surviving chains per distinct target/strand group [1].
+.TP
+.BI --gpu-prefilter-xdrop= NUM
+X-drop threshold for the GPU gapless extension used by
+.B --gpu-prefilter
+[40].
+.TP
+.B --gpu-prefilter-adaptive
+Instead of the fixed
+.BR --gpu-prefilter-topk ,
+pick K per query from {1,2,4,8,
+.BR --gpu-prefilter-topk }
+based on the score margin between the best and runner-up chain. Implies
+.BR --gpu-prefilter .
+.SS Input/Output options
+.TP 10
+.BI -t \ INT
+Number of threads [4]
+.TP
+.I query.hmm
+A query file whose name ends in
+.I .hmm
+is read as HMMER3 text profiles instead of protein FASTA. See HMMER3 PROFILE
+QUERIES below.
+.TP
+.B --gff
+Output in the GFF3 format. `##PAF' lines in the output provide detailed
+alignments.
+.TP
+.B --gff-only
+Output in the GFF3 format without `##PAF' lines.
+.TP
+.B --aln
+Output the residue alignment in three lines, where line `##ATN' for the target
+nucleotide sequence, `##ATA' for translated amino acid sequence and `##AQA' for
+the query protein sequence. On a `##ATA' line, `!' denotes a frameshift
+insertion corresponding to the `F' CIGAR operator and `$' denotes a frameshift
+substitution corresponding to the `G' operator.
+.TP
+.B --trans
+Output translated protein sequences on `##STA' lines.
+.TP
+.B --no-cs
+Do not output the cs tag
+.TP
+.BI --max-intron-out \ NUM
+In the
+.B --aln
+format, if an intron is longer than
+.IR NUM ,
+only output
+.RI ceil( NUM /2)
+basepairs at the donor or the acceptor sites and write the full intron length
+.I LEN
+as
+.RI ~ LEN ~
+in the middle [200].
+.TP
+.BI -P \ STR
+Prefix for IDs in GFF3 or GTF [MP].
+.B --gff-delim
+overrides this option.
+.TP
+.BI --gff-delim \ CHAR
+Change the ID field in GFF3 to
+.RI QueryName CHAR HitIndex
+[]. If not specified, the default ID looks like `MP000012'. This option is only
+applicable to the GFF3 output format.
+.TP
+.B --gtf
+Output in the GTF format
+.TP
+.B -u
+Print unmapped query proteins
+.TP
+.BI --outn \ NUM
+Output up to
+.RI min{ NUM ,
+.BR -N }
+alignments per query [1000].
+.TP
+.BI --outs \ FLOAT
+Output an alignment only if its score is at least
+.IR FLOAT *bestScore,
+where bestScore is the best alignment score of the protein [0.99]
+.TP
+.BI --outc \ FLOAT
+Output an alignment only if
+.I FLOAT
+fraction of the query protein is aligned [0.1]
+.TP
+.BI -K \ NUM
+Query batch size [2M]
+.SH OUTPUT FORMAT
+.SS The GFF3 Format
+ProtLocus outputs alignment in the extended Pairwise mApping Format (PAF) by
+default (see the next subsection). It can also output GFF3 with option
+.BR --gff .
+ProtLocus may output three features: `mRNA', `CDS' or `stop_codon'. Here, a
+stop_codon is only reported if the alignment reaches the C-terminus of the
+protein and the next codon is a stop codon. Per GenCode rule, stop_codon is not
+part of CDS but it is part of mRNA or exon.
+
+ProtLocus may output the following attributes in GFF3:
+.TS
+center box;
+cb | cb | cb
+l | c | l .
+Attribute	Type	Description
+_
+ID	str	mRNA identifier
+Parent	str	Identifier of the parent feature
+Rank	int	Rank among all hits of the query
+Identity	real	Fraction of exact amino acid matches
+Positive	real	Fraction of positive amino acid matches
+Donor	str	2bp at the donor site if not GT
+Acceptor	str	2bp at the acceptor site if not AG
+Frameshift	int	Number of frameshift events in alignment
+StopCodon	int	Number of in-frame stop codons
+Target	str	Protein coordinate in alignment
+.TE
+
+.SS The PAF Format
+PAF gives detailed alignment. It is a TAB-delimited text format with each line
+consisting of at least 12 fields as are described in the following table:
+.TS
+center box;
+cb | cb | cb
+r | c | l .
+Col	Type	Description
+_
+1	string	Protein sequence name
+2	int	Protein sequence length
+3	int	Protein start coordinate (0-based)
+4	int	Protein end coordinate (0-based)
+5	char	`+' for forward strand; `-' for reverse
+6	string	Contig sequence name
+7	int	Contig sequence length
+8	int	Contig start coordinate on the original strand
+9	int	Contig end coordinate on the original strand
+10	int	Number of matching nucleotides
+11	int	Number of nucleotides in alignment excl. introns
+12	int	Mapping quality (0-255 with 255 for missing)
+.TE
+
+.PP
+PAF may optionally have additional fields in the SAM-like typed key-value
+format. ProtLocus may output the following tags:
+.TS
+center box;
+cb | cb | cb
+r | c | l .
+Tag	Type	Description
+_
+AS	i	Alignment score from dynamic programming
+ms	i	Alignment score excluding introns
+np	i	Number of amino acid matches with positive scores
+fs	i	Number of frameshifts
+st	i	Number of in-frame stop codons
+da	i	Distance to the nearest start codon
+do	i	Distance to the nearest stop codon
+cg	Z	Protein CIGAR
+cs	Z	Difference string
+.TE
+
+.PP
+A protein CIGAR consists of the following operators:
+.TS
+center box;
+cb | cb
+r | l .
+Op	Description
+_
+nM	Alignment match. Consuming n*3 nucleotides and n amino acids
+nI	Insertion. Consuming n amino acids
+nD	Deletion. Consuming n*3 nucleotides
+nF	Frameshift deletion. Consuming n nucleotides
+nG	Frameshift match. Consuming n nucleotides and 1 amino acid
+nN	Phase-0 intron. Consuming n nucleotides
+nU	Phase-1 intron. Consuming n nucleotides and 1 amino acid
+nV	Phase-2 intron. Consuming n nucleotides and 1 amino acid
+.TE
+
+.PP
+The
+.B cs
+tag encodes difference sequences. It consists of a series of operations:
+.TS
+center box;
+cb | cb |cb
+r | l | l .
+Op	Regex	Description
+_
+ :	[0-9]+	Number of identical amino acids
+ *	[acgtn]+[A-Z*]	Substitution: ref to query
+ +	[A-Z]+	# aa inserted to the reference
+ -	[acgtn]+	# nt deleted from the reference
+ ~	[acgtn]{2}[0-9]+[acgtn]{2}	Intron length and splice signal
+.TE
+
+.SH HMMER3 PROFILE QUERIES
+A query file ending in
+.I .hmm
+may hold one or many HMMER3 profiles (for example
+.BR "cat *.hmm > library.hmm" ).
+Each profile needs
+.BR NAME ,
+.BR LENG ,
+.BR "ALPH amino" ,
+the
+.B HMM
+header line, the per-position match-emission and transition lines and the
+.B //
+terminator;
+.B COMPO
+is skipped. Every profile is mapped as an independent query in the same
+multi-threaded mini-batch pipeline as FASTA input, and
+.I .hmm
+and FASTA files may be mixed on one command line.
+.PP
+Seeds are taken from the profile consensus (highest-emission residue per
+position) and from up to 64 variant sequences that substitute near-tie
+residues, so ambiguous columns do not lose seeds. Candidate regions are scored
+by a position-specific Viterbi DP over match/insert/delete states; all regions
+of a query are scored in one batched pass. In PAF the query name is
+.BR NAME ,
+the query length is
+.B LENG
+and
+.B AS:i
+is the Viterbi score. Residue alignment, CIGAR, GFF3/GTF,
+.BR --aln ,
+.B --trans
+and
+.B -u
+use the consensus sequence and work unchanged.
+.PP
+For whole-library scans (thousands of profiles) use
+.B --prescreen
+with a
+.BR --tier :
+candidate loci are then generated in-process from a six-frame ORF index instead
+of genome-wide k-mer seeding, which is both faster and more sensitive for
+divergent families. Single or few profiles work well with the default
+seeding path (optionally with
+.BR --gpu ).
+.SH ENVIRONMENT
+.TP 10
+.B MP_HMM_GPU
+If set, HMM profile scoring runs on the OpenCL device (one work-group per
+candidate region) for profiles with at most 1023 match states; longer profiles
+use the CPU. Off by default because it competes with the extension pipeline
+for the device.
+.TP
+.B MP_HMM_GPU_DEBUG
+Print HMM GPU batch statistics at exit.
+.TP
+.B NS_EXT_GPU_QUEUES
+Number of OpenCL command queues used by the extension executor [8, max 16].
+.TP
+.B NS_EXT_GPU_DEBUG
+1: print one
+.B [ns_ext_gpu]
+statistics line at exit (flushes, launches, work-groups, GPU/CPU request
+counts, upload volume, cells, prep/upload/device/cpu/wait seconds); 2: also
+log every launch; 3: also verify the device-side input preparation against the
+host.
+.TP
+.B NS_EXT_GPU_NO_WARP
+Do not build the warp-synchronous (inline PTX) kernel; use the portable
+work-group kernel.
+.TP
+.B NS_EXT_GPU_STRICT
+Abort instead of silently falling back to the CPU when a GPU-eligible
+extension request cannot be served by the device.
+.TP
+.B NS_GPU_DEBUG_CHECK
+Verify the nt/aa span of every sub-alignment CIGAR and dump the inputs and
+scoring options on mismatch.
+.SH LIMITATIONS
+.TP 2
+*
+The initial conditions of dynamic programming are not technically correct,
+which may result in suboptimal residue alignment in rare cases.
+.TP
+*
+Support for non-splicing alignment needs to be improved.
+.TP
+*
+With
+.BR --gpu ,
+about 0.7% of PAF lines differ from the CPU build: almost all describe the
+same locus with a different equal-score alignment path (CIGAR, cs, ms, np,
+columns 10-11), a few have shifted boundaries. The extension DP itself is
+bit-identical; the differences come from tie-breaking in the CIGAR-producing
+gap DP. GPU reruns are byte-identical.
+.TP
+*
+HMM profile queries seed from the consensus; a family with no recognisable
+consensus k-mers in the genome can be missed even if the profile would score
+it.

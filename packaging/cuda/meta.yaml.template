@@ -1,0 +1,50 @@
+{% set version = "__VERSION__" %}
+
+package:
+  name: protlocus-cuda
+  version: {{ version }}
+
+source:
+  url: https://github.com/__REPOSITORY__/releases/download/v{{ version }}/protlocus-{{ version }}.tar.gz
+  sha256: __SHA256__
+
+build:
+  number: 2
+  skip: true  # [not linux or not x86_64]
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ stdlib('c') }}
+    - make
+    - {{ compiler('cuda') }}
+    - {{ compiler('cxx') }}
+  host:
+    - zlib
+    - cuda-cudart-dev >=12.4,<12.5
+  run:
+    - protlocus =={{ version }}
+    - zlib
+    - cuda-cudart >=12.4,<13
+    - python >=3.9
+    - bash
+    - time
+
+test:
+  source_files:
+    - test/DPP3-hs.gen.fa.gz
+    - test/DPP3-mm.pep.fa.gz
+  commands:
+    - protlocus-cuda --version
+    - protlocus-cuda --help
+
+about:
+  home: https://github.com/__REPOSITORY__
+  license: MIT
+  license_file: LICENSE.txt
+  summary: CUDA backend for ProtLocus, with a separate executable.
+  dev_url: https://github.com/__REPOSITORY__
+
+extra:
+  recipe-maintainers:
+    - __MAINTAINER__
