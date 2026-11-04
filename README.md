@@ -1,6 +1,6 @@
 # ProtLocus
 
-ProtLocus finds protein-coding genes in genomic DNA using protein sequences or protein-family HMM profiles. It supports splice-aware protein-to-genome alignment, HMM-guided candidate searches, and alignment-derived gene models. The alignment engine is based on [miniprot](https://github.com/lh3/miniprot) 0.18-r281.
+ProtLocus finds protein-coding genes in genomic DNA using protein sequences or protein-family HMM profiles. It supports splice-aware protein-to-genome alignment, HMM-guided candidate searches, and alignment-derived gene models. 
 
 ## Features
 
